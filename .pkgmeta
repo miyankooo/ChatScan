@@ -1,1 +1,4 @@
 package-as: ChatScan
+
+ignore:
+  - CLAUDE.md
