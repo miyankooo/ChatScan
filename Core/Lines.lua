@@ -90,14 +90,14 @@ end
 
 -- The author as Blizzard's Communities chat shows it (CommunitiesChatMixin:FormatMessage): a
 -- Battle.net community link, a class-coloured character link, or the bare name for other clubs.
--- Discord authors only post in guild streams, which ChatScan reads as Guild or Guild Discord chat.
+-- Guild streams are never offered, so guild and Discord authors never reach this.
 local function streamAuthor(clubId, streamId, message)
     local author, id = message.author, message.messageId
     local name = author.name or " "
     local shown = author.timerunningSeasonID and TimerunningUtil.AddSmallIcon(name) or name
     if author.clubType == Enum.ClubType.BattleNet then
         return GetBNPlayerCommunityLink(name, shown, author.bnetAccountId, clubId, streamId, id.epoch, id.position)
-    elseif author.clubType == Enum.ClubType.Character or author.clubType == Enum.ClubType.Guild then
+    elseif author.clubType == Enum.ClubType.Character then
         local classInfo = author.classID and C_CreatureInfo.GetClassInfo(author.classID)
         local classColor = classInfo and RAID_CLASS_COLORS[classInfo.classFile]
         if classColor then shown = classColor:WrapTextInColorCode(shown) end

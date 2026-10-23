@@ -1,68 +1,78 @@
 # Chat Scan
 
-Watches the chat you pick (channels, community streams, guild, group, nearby chat and whispers) and forwards any message matching your keyword rules to the chat tabs you pick.
+Watches the chat you pick for your keywords and forwards every matching line to the chat tabs you choose, with an optional sound.
 
 ## Features
 
-- Keyword rules with **OR** across rows and **AND** within a row, case-insensitive plain text
-- Route matches to any chat tabs you choose; the receiving tab flashes if you are not looking at it
-- Scan any channel you are in: world and zone channels, custom channels, and community channels added to a chat tab
-- Scan community streams that are in none of your chat tabs
-- Scan guild, officer and Guild Discord chat, party, raid (with raid warnings) and instance chat including leader lines, say, yell and emotes, and whispers with characters and Battle.net friends, both incoming and your own outgoing ones
-- Forwarded lines look like the game's own: the chat's colour, its tag (the numbered channel, `[Guild]`, `[Party Leader]`, "whispers:", "To" and so on), and the sender in class colour when your chat settings colour names by class. Each line is stamped with its time
-- Click the sender's name to whisper, right-click for the usual player menu; click the channel or group tag to talk there, right-click it for its menu
-- Matches deduplicated for 10 seconds, so the same line never repeats
-- Optional alert sound with preview, throttled to once every 3 seconds
-- Raid-target markers like `{star}` and `{skull}` rendered as icons, exactly as the game's own chat does
-- Zone channels such as General and Trade stay selected when you change zones
-- Minimap button (spyglass) and an Addon Compartment entry, sharing one tooltip; left-click either to toggle the panel
-- A native panel built from the game's own frame art, fonts and controls, on the shared LibNativeUI-1.0 design system (8 px spacing grid, 12 px text)
-- Settings and scan state saved per character, the minimap button position shared by all characters; an active scan resumes after login or `/reload`
+- Keyword rules: each row is one rule, and commas inside a row require every word
+- Keywords match at the start of a word and ignore case, so `lf` finds LFG and LF1M but not "self"
+- Scans any channel you are in, such as General, Trade and LookingForGroup, custom channels and community channels
+- Scans guild, officer and Guild Discord chat, party, raid and instance chat, say, yell, emotes and whispers
+- Forwarded lines look like the game's own, with the channel tag, the chat colour and a clickable sender
+- Lines carry your chat timestamp, or a grey time when chat timestamps are off
+- A repeated line from the same sender is shown once every 2 minutes
+- An optional alert sound, at most once every 3 seconds
+- Zone channels such as General and Trade stay ticked when you change zones
+- A minimap button and an Addon Compartment entry. Left-click opens the window, right-click starts or stops the scan, and the tooltip lists your keywords
+- Settings are saved per character, and an active scan resumes after login or `/reload`
 
 ## Installation
 
-1. Copy the `ChatScan/` folder into the `Interface/AddOns/` folder of your WoW Forever installation.
-2. Restart the game or `/reload`.
-3. Enable **Chat Scan** in the AddOns list.
+1. Install it with the CurseForge app under WoW Forever, or copy the `ChatScan` folder into `World of Warcraft/_classic_beta_/Interface/AddOns/`.
+2. Restart the game or type `/reload`.
+3. Enable Chat Scan in the AddOns list.
 
 ## Usage
 
-Open the panel with `/cs`, the minimap button or the Addon Compartment, then:
-
-- **Scanned Channels**: tick the channels to watch. The list updates as you join and leave channels. Community channels show their community and stream name.
-- **Community Streams**: tick community streams that are in none of your chat tabs. Adding a stream to a chat tab moves it to Scanned Channels and keeps its tick. The list is hidden while the game locks chat.
-- **Chat Types**: tick guild, group, nearby chat and whispers. Leader lines and raid warnings count as their group's chat, and your own outgoing whispers count as whispers. Built-in emotes such as `/wave` are not scanned.
-- **Keywords**: type a rule in the trailing empty row and press **Add** or Enter. Commas inside a row require all of those words. Press the **X** to remove a rule.
-- **Output Tabs**: pick the open chat tabs that receive matches. With none picked, or when every picked tab is closed, matches go to the default chat frame.
-- **Alert Sound**: turn the alert on, pick a sound, and **Test** it.
-- **Start**: begins the scan. The button then reads **Stop**, and the status line under the title shows **Scanning** with the live match count.
-
-Channel, chat type, tab and sound changes apply to a running scan straight away. If a running scan has no keyword or nothing ticked left, the status line reads **Nothing to match**. Escape or the corner X closes the panel; drag it anywhere. The panel keeps its size: when a column holds more than fits, scroll it with the mouse wheel or its scroll bar.
-
-Your own messages are forwarded too, in channels, community streams and every chat type, on purpose: it lets you test your rules in game on your own. Whether to skip them is a later decision.
+1. Type `/cs`, or click the minimap button or the Addon Compartment entry. The first time, the channels you have joined are ticked for you.
+2. Under Keywords, type a rule such as `wts thunderfury` or `lf, tank` and press Enter. The scan starts.
+3. Under Channels and Chat Types, tick the chat to watch.
+4. Under Output Tabs, tick the chat tabs that receive matches. With none ticked, matches go to your main chat tab.
+5. Under Sound, pick an alert or None.
+6. Press Stop to pause the scan and Start to resume it.
 
 | Rule | Matches |
 | --- | --- |
-| `wts thunderfury` | any message containing `wts thunderfury` |
-| `lf, tank` | messages containing both `lf` and `tank` |
-| `lf, tank` and `lf, heal` as two rows | `lf`+`tank` **or** `lf`+`heal` |
+| `wts thunderfury` | lines containing `wts thunderfury` |
+| `lf, tank` | lines containing both `lf` and `tank` |
+| `lf, tank` and `lf, heal` as two rows | `lf` with `tank`, or `lf` with `heal` |
 
 ## Commands
 
-| Command | Description |
+| Command | Does |
 | --- | --- |
-| `/cs` | Toggle the scan panel |
-| `/cs <keyword>` | Add a keyword (or `word1,word2` for an AND group) and start scanning |
-| `/cs start` | Start scanning with saved settings |
-| `/cs stop` | Stop the active scan |
-| `/cs clear` | Empty the keyword list |
+| `/cs` | Opens or closes the window |
+| `/cs <rule>` | Adds a rule, such as `/cs lf, tank`, and starts scanning |
+| `/cs start` | Starts scanning with your saved settings |
+| `/cs stop` | Stops scanning |
+| `/cs clear` | Removes every rule |
+| `/cs minimap` | Hides or shows the minimap button |
 
-`/chatscan` works as an alias.
-
-## Chat lockdown
-
-WoW Forever can withhold chat text from addons in some situations (chat messaging lockdown). While it does, Chat Scan pauses matching, says so once in chat, and shows **Chat locked by client** in the panel and the minimap tooltip. Matching resumes by itself when the text is readable again.
+`/chatscan` works as well.
 
 ## Requirements
 
-WoW Forever 1.60.x.
+WoW Forever 1.60.x (Interface `16001`). No other addons needed.
+
+## Restrictions
+
+The game can hide chat text from addons in some places, such as dungeons, raids and battlegrounds. Chat Scan then pauses matching, says so once in chat and shows "Chat locked" in the window and the minimap tooltip. It picks up again when the text is readable.
+
+Battle.net communities are not scanned, because the game hands their text to addons in a protected form.
+
+Your own lines are forwarded too, including the whispers you send.
+
+Built-in emotes such as `/wave`, voice chat, NPC chat and system messages are not scanned.
+
+## Development
+
+Run the offline checks from the `ChatScan` folder:
+
+```sh
+lua Tests/Scanner.lua
+lua Tests/LibNativeUI.lua
+```
+
+## License
+
+MIT. See [LICENSE](LICENSE).

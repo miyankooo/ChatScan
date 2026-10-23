@@ -4,12 +4,16 @@ local _, ns = ...
 -- launcher, whose LibDataBroker name it also is.
 ns.TITLE = "Chat Scan"
 
--- interface/icons/inv_misc_spyglass_03.blp, the same file id as the toc's IconTexture.
-ns.ICON = 134442
+-- The same icon as the toc's IconTexture.
+ns.ICON = "Interface\\Icons\\INV_Misc_Spyglass_03"
 
-ns.DEDUP_TTL = 10
-ns.DEDUP_MAX = 20
+-- Trade posts repeat every 30 to 90 seconds, so a repeat within 2 minutes is shown once.
+ns.DEDUP_TTL = 120
+ns.DEDUP_MAX = 100
 ns.SOUND_THROTTLE = 3.0
+
+-- The alert plays on the master channel, so it is heard even with sound effects turned off.
+ns.SOUND_CHANNEL = "Master"
 
 -- Named alerts for the sound picker, so the player never types a raw sound kit id.
 ns.SOUNDS = {
@@ -22,18 +26,21 @@ ns.SOUNDS = {
 }
 ns.DEFAULT_SOUND_ID = SOUNDKIT.MAP_PING
 
+-- The sound id that stands for the None pick.
+ns.NO_SOUND = 0
+
 -- Chat that is not a numbered channel, labelled with Blizzard's chat settings strings. One tick
 -- covers every event Blizzard prints under that chat, so leader lines count as their group's and
--- the player's own outgoing whispers count as whispers. Own lines are forwarded on purpose, so the
--- owner can test in game; skipping them is a later decision. Canned emotes (/wave) are text the
--- client writes, so they are left out; /e emotes are typed by the sender and stay in.
+-- the player's own outgoing whispers count as whispers. Own lines are always forwarded, a product
+-- rule. Canned emotes (/wave) are text the client writes, so they are left out; /e emotes are
+-- typed by the sender and stay in.
 ns.CHAT_GROUPS = {
-    { title = "Guild", types = {
+    { title = GUILD, types = {
         { key = "guild", label = GUILD_CHAT, events = { "CHAT_MSG_GUILD" } },
         { key = "officer", label = OFFICER_CHAT, events = { "CHAT_MSG_OFFICER" } },
         { key = "guilddiscord", label = GUILD_DISCORD_CHAT, events = { "CHAT_MSG_GUILD_DISCORD" } },
     } },
-    { title = "Group", types = {
+    { title = GROUP, types = {
         { key = "party", label = PARTY, events = { "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER" } },
         { key = "raid", label = RAID, events = { "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RAID_WARNING" } },
         { key = "instance", label = INSTANCE_CHAT, events = { "CHAT_MSG_INSTANCE_CHAT", "CHAT_MSG_INSTANCE_CHAT_LEADER" } },
@@ -52,12 +59,19 @@ ns.CHAT_GROUPS = {
 -- ChatFrame2 is always reset and docked as the combat log, so it never receives forwarded lines.
 ns.COMBAT_LOG_INDEX = 2
 
-function ns.matchLabel(count)
-    return string.format("%d match%s", count, count == 1 and "" or "es")
+function ns.countLabel(count, one, many)
+    return string.format("%d %s", count, count == 1 and one or many)
 end
 
 function ns.trim(text)
     return (text or ""):match("^%s*(.-)%s*$")
+end
+
+-- A rule made only of commas and spaces can never match, so it is never stored.
+ns.NO_TERM = "A rule needs at least one word."
+
+function ns.hasTerm(row)
+    return row:find("[^,%s]") ~= nil
 end
 
 -- Zone channels carry a " - Zone" suffix, so it is dropped to keep a scan alive across zone

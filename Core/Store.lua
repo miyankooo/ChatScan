@@ -6,11 +6,14 @@ ns.Store = Store
 local store
 
 -- Scan settings are per character (ChatScanCharDB), so the client keeps characters apart instead of
--- a name key. ChatScanDB holds only what every character shares: the minimap button. Channels and
--- community streams share inputChannels, keyed by channel name; chatTypes holds CHAT_GROUPS keys.
+-- a name key. ChatScanDB holds only what every character shares: the minimap button and the window
+-- position. Channels and community streams share inputChannels, keyed by channel name; chatTypes
+-- holds CHAT_GROUPS keys. soundId ns.NO_SOUND turns the alert off. channelsSeeded marks that the
+-- joined channels were ticked once on first use.
 function Store.Init()
     ChatScanDB = ChatScanDB or {}
     ChatScanDB.minimap = ChatScanDB.minimap or { hide = false, minimapPos = 195 }
+    ChatScanDB.window = ChatScanDB.window or {}
 
     ChatScanCharDB = ChatScanCharDB or {}
     store = ChatScanCharDB
@@ -20,7 +23,6 @@ function Store.Init()
     store.outputs = store.outputs or {}
     store.keywords = store.keywords or {}
     store.scanEnabled = store.scanEnabled or false
-    if store.playSound == nil then store.playSound = true end
     store.soundId = store.soundId or ns.DEFAULT_SOUND_ID
 end
 
@@ -31,4 +33,8 @@ end
 
 function Store.Minimap()
     return ChatScanDB.minimap
+end
+
+function Store.Window()
+    return ChatScanDB.window
 end

@@ -1,10 +1,10 @@
 ## Interface: 16001
 ## Title: Chat Scan
-## Notes: Forwards chat channel messages that match your keyword rules (OR across rows, AND within a row) to the chat tabs you pick.
+## Notes: Forwards chat messages that match your keywords to the chat tabs you pick.
 ## Author: miyanko
-## Version: 3.0.0
+## Version: 1.0.0
 ## Category: Chat
-## IconTexture: 134442
+## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
 ## SavedVariables: ChatScanDB
 ## SavedVariablesPerCharacter: ChatScanCharDB
 
