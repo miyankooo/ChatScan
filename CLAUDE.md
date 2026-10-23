@@ -10,10 +10,19 @@
 
 - Chat payload fields 1, 2, 5, 12, 13 and 18 are secret during chat lockdown. Filter by tick first, then check `C_ChatInfo.InChatMessagingLockdown()`, and only then read the text. Guild Discord goes through the same gate.
 - `Core/Lines.lua` builds every forwarded line like Blizzard's `MessageFormatter` in `Mainline/ChatFrameOverrides.lua`, so tags, colours and links match Blizzard's own lines.
-- The player's own lines are forwarded on purpose, for in-game testing.
+- The player's own lines, sent whispers included, are always forwarded. This is a product rule (owner decision 2026-10-16), not a test aid.
+- Keywords match at a word start (`%f[%w]` plus the escaped term). A term that opens with punctuation or a non-ASCII byte matches anywhere.
+- Battle.net communities are not offered and K-string club text is skipped: their text is not readable plain text.
+- The alert plays on the `Master` channel. `soundId` 0 means None.
 - Left out on purpose: `CHAT_MSG_TEXT_EMOTE`, `CHAT_MSG_AFK`, `CHAT_MSG_DND`, voice channels, NPC and system chat.
-- The UI is built from LibNativeUI-1.0: `UI.Font` roles, `UI.Space` and the 8 px grid. No local layout constants, no literal `|cff` codes.
-- The window has a fixed 674x600 size and each well scrolls. Keep the minimap icon. No options page.
+- The UI is built from LibNativeUI-1.0: `UI.Font` roles, `UI.Space`, `UI.Native` and the 4 px grid. No `N * UI.GRID` sizes, no literal `|cff` codes.
+- The window has a fixed 674x548 size (674 carries Blizzard's 4/-6 inset offsets), no attic, and each well scrolls. The status sits in an inset that fills the button bar left of Start. Keep the minimap button, hideable with `/cs minimap`: left-click toggles the window, right-click starts or stops the scan through `Scanner.Toggle`, and the tooltip lists the keywords. No options page.
+- Title Case for headings and buttons, sentence case ending in a period for helper lines and chat. Use Blizzard global strings where one exists (`ADD`, `CHANNELS`, `GUILD`, `GROUP`, `SOUND`, `NONE`, `START`).
+- One chat line per action, and no chat at login: a resumed scan stays quiet.
+- First use (window open or `/cs <rule>`) ticks the joined channels once through `ns.SeedChannels`, never in chat lockdown.
+- The Sound slot holds the dropdown's art below the button (`DROPDOWN_ART_BELOW`), so the scroll frame never clips it.
+- The toc version stays 1.0.0 until the first CurseForge release.
+- Licence: MIT (LICENSE).
 
 ## Libraries
 
@@ -22,11 +31,12 @@
 
 ## Checks
 
-- Run `luac -p` on every Lua file after a change. The repo has no test harness.
+- Run `luac -p` on every Lua file after a change.
+- Run `lua Tests/Scanner.lua` (matching, dedupe, sound) and `lua Tests/LibNativeUI.lua` from the repo folder.
 - Turn on `/console scriptErrors 1` before testing in game.
 
 ## Release
 
-1. Push `main` and tag `vX.Y.Z` with an annotated tag.
+1. Move the `## Unreleased` entries in `CHANGELOG.md` under the version, push `main` and tag `vX.Y.Z`.
 2. `.github/workflows/release.yml` packages it with the BigWigsMods packager.
 3. Check that the zip holds all five libraries.

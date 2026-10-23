@@ -1,11 +1,11 @@
 name: Package and release
 
-# Runs on annotated version tags. Without CF_API_KEY and a toc X-Curse-Project-ID the packager
-# skips the CurseForge upload and only publishes the zip as a GitHub release.
+# Runs on version tags. Without CF_API_TOKEN and a toc X-Curse-Project-ID the packager skips the
+# CurseForge upload and only publishes the zip as a GitHub release.
 on:
   push:
     tags:
-      - "**"
+      - "v*"
 
 permissions:
   contents: write
@@ -14,10 +14,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      CF_API_KEY: ${{ secrets.CF_API_KEY }}
-      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      # Full history, so the packager can build a changelog from the previous tag.
+      # Full history, so the packager can find the previous tag.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0

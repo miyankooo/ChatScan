@@ -6,13 +6,17 @@ local Store = ns.Store
 
 -- Two equal wells side by side, one gap apart, inside the template's own inset margins. A well
 -- leaves 288px of content beside its scroll gutter: room for the 12px helper lines and for two chat
--- type blocks of 144px.
-local COLUMN_W = 41 * UI.GRID
+-- type blocks of 144px. The outer width carries Blizzard's 4/-6 inset offsets, so it is 674.
+local COLUMN_W = 328
 local PANEL_W = PANEL_INSET_LEFT_OFFSET + 2 * COLUMN_W + UI.Space.gap - PANEL_INSET_RIGHT_OFFSET
 
--- A fixed height that leaves room on a 768px-tall UI; the wells scroll instead of the window
--- growing with its lists.
-local PANEL_H = 75 * UI.GRID
+-- A fixed height: the right well fits up to three output tabs without scrolling, and longer lists
+-- scroll inside their well instead of growing the window. The window has no attic, because the status
+-- sits in the button bar.
+local PANEL_H = 548
+
+-- WowStyle1Dropdown art reaches 9px below the button (Blizzard_Menu/Mainline/MenuTemplates.xml:10).
+local DROPDOWN_ART_BELOW = 9
 
 -- Each well's scroll area sits one padding in from its top, left and bottom and leaves the scroll
 -- bar's gutter free on the right, so the bar stays inside the inset.
@@ -20,9 +24,6 @@ local CONTENT_W = COLUMN_W - UI.Space.padding - UI.ScrollGutter()
 
 -- Two chat type blocks share a row of the Chat Types section.
 local BLOCK_W = CONTENT_W / 2
-
-local ADD_W = 7 * UI.GRID
-local TEST_W = 8 * UI.GRID
 
 local panel
 
@@ -37,10 +38,6 @@ local function createCheckList(container, emptyText)
     empty:SetHeight(UI.Size.row)
     empty:SetText(emptyText)
 
-    function list:SetEmptyText(text)
-        empty:SetText(text)
-    end
-
     -- Renders entries top-down and returns the height used.
     function list:Render(entries, isChecked, onClick)
         for _, checkbox in ipairs(self.active) do
@@ -53,7 +50,7 @@ local function createCheckList(container, emptyText)
         for i, entry in ipairs(entries) do
             local checkbox = table.remove(self.pool) or UI.CreateCheckbox(container)
             checkbox:SetPoint("TOPLEFT", container, "TOPLEFT", 0, -(i - 1) * UI.Size.row)
-            checkbox.Text:SetText(entry.name)
+            checkbox:SetLabel(entry.name)
             checkbox:SetChecked(isChecked(entry))
             checkbox:SetScript("OnClick", function(self) onClick(entry, self:GetChecked()) end)
             checkbox:Show()
@@ -66,14 +63,18 @@ local function createCheckList(container, emptyText)
 end
 
 -- Community channels are named Community:<clubId>:<streamId>, which Blizzard's chat shows as the
--- community and stream name. C_Club names turn secret in chat lockdown and are missing before the
--- club loads, so the raw name stays then; every other channel name passes through unchanged.
-local function channelLabel(name)
+-- community and stream name; every other channel name passes through unchanged. Battle.net
+-- community text arrives as protected K-strings matching cannot read, so those channels get no
+-- entry. The club type is secret in chat lockdown and missing before the club loads, so a community
+-- channel stays out of the list until it can be told apart, as its streams do.
+local function channelEntry(name)
+    local entry = { name = name, key = ns.channelKey(name) }
     local clubId = ChatFrameUtil.GetCommunityAndStreamFromChannel(name)
-    if not clubId or C_ChatInfo.InChatMessagingLockdown() or not C_Club.GetClubInfo(clubId) then
-        return name
-    end
-    return ChatFrameUtil.ResolveChannelName(name)
+    if not clubId then return entry end
+    local club = not C_ChatInfo.InChatMessagingLockdown() and C_Club.GetClubInfo(clubId)
+    if not club or club.clubType == Enum.ClubType.BattleNet then return nil end
+    entry.name = ChatFrameUtil.ResolveChannelName(name)
+    return entry
 end
 
 -- Every channel the player is in, community channels included. The key stays the raw channel name,
@@ -82,25 +83,25 @@ local function channelEntries()
     local list = { GetChannelList() }
     local entries, seen = {}, {}
     for i = 1, #list, 3 do
-        local name = list[i + 1]
-        local key = ns.channelKey(name)
-        if not seen[key] then
-            seen[key] = true
-            entries[#entries + 1] = { name = channelLabel(name), key = key }
+        local entry = channelEntry(list[i + 1])
+        if entry and not seen[entry.key] then
+            seen[entry.key] = true
+            entries[#entries + 1] = entry
         end
     end
     return entries
 end
 
 -- Subscribed community streams that are in no chat tab, so they reach the scan only as community
--- messages; a stream in a chat tab is a chat channel and listed with the channels. Guild streams
--- are Guild and Officer chat under Chat Types. The key is the stream's channel name, so a stream
--- keeps its tick when it moves into or out of a chat tab. Callers skip this in chat lockdown,
--- where club and stream data are secret; before the clubs load the C_Club calls return nothing.
+-- messages; a stream in a chat tab is a chat channel and arrives through channelEntries. Guild
+-- streams are Guild and Officer chat under Chat Types, and Battle.net communities are skipped as in
+-- channelEntry. The key is the stream's channel name, so a stream keeps its tick when it moves into
+-- or out of a chat tab. Callers skip this in chat lockdown, where club and stream data are secret;
+-- before the clubs load the C_Club calls return nothing.
 local function streamEntries()
     local entries = {}
     for _, club in ipairs(C_Club.GetSubscribedClubs() or {}) do
-        if club.clubType ~= Enum.ClubType.Guild then
+        if club.clubType ~= Enum.ClubType.Guild and club.clubType ~= Enum.ClubType.BattleNet then
             for _, stream in ipairs(C_Club.GetStreams(club.clubId) or {}) do
                 local clubId, streamId = club.clubId, stream.streamId
                 local localID = ChatFrameUtil.GetCommunitiesChannelLocalID(clubId, streamId)
@@ -146,22 +147,24 @@ local function createChatTypeGrid(content, onClick)
     return checks, top + rowH
 end
 
--- A library section whose body holds a muted helper line and, one gap below it, the section's own
--- content. The helper's two anchors give it the width it needs to measure its wrap.
+-- A library section whose body holds the section's own content, below an optional muted helper
+-- line. The helper's two anchors give it the width it needs to measure its wrap.
 local function createSection(column, title, helperText)
     local section = UI.CreateSection(column, title)
-
-    local helper = UI.CreateText(section.body, "muted")
-    helper:SetPoint("TOPLEFT")
-    helper:SetPoint("TOPRIGHT")
-    helper:SetText(helperText)
-
     section.content = CreateFrame("Frame", nil, section.body)
+
+    local helper
+    if helperText then
+        helper = UI.CreateText(section.body, "muted")
+        helper:SetPoint("TOPLEFT")
+        helper:SetPoint("TOPRIGHT")
+        helper:SetText(helperText)
+    end
 
     -- The helper's wrapped height is snapped, so the content starts on the grid and a long helper
     -- line never overlaps it.
     function section:Layout(contentHeight)
-        local offset = UI.Snap(helper:GetStringHeight()) + UI.Space.gap
+        local offset = helper and UI.Snap(helper:GetStringHeight()) + UI.Space.gap or 0
         self.content:SetPoint("TOPLEFT", self.body, "TOPLEFT", 0, -offset)
         self.content:SetPoint("TOPRIGHT", self.body, "TOPRIGHT", 0, -offset)
         self.content:SetHeight(contentHeight)
@@ -220,25 +223,6 @@ local function persistKeywords()
     Scanner.ReloadKeywords()
 end
 
--- A row already saved in any case is not stored twice, the same rule as /cs <keyword>.
-local function commitRow(row)
-    local typed = ns.trim(row.editBox:GetText())
-    if typed == "" then return end
-    local lower = typed:lower()
-    for _, other in ipairs(KeywordRows.active) do
-        if other ~= row and other.saved and other.saved:lower() == lower then
-            typed = row.saved
-            break
-        end
-    end
-    row.saved = typed
-    row.editBox:SetText(typed or "")
-    row.editBox:ClearFocus()
-    row:UpdateState()
-    persistKeywords()
-    panel:RefreshKeywords()
-end
-
 local function deleteRow(row)
     tDeleteItem(KeywordRows.active, row)
     row.saved = nil
@@ -246,6 +230,40 @@ local function deleteRow(row)
     KeywordRows.pool[#KeywordRows.pool + 1] = row
     persistKeywords()
     panel:RefreshKeywords()
+end
+
+-- The same rules as /cs <keyword>: a rule needs a word, a rule saved in any case is not stored
+-- twice, and adding one starts the scan. A refused rule keeps its text so it can be fixed.
+local function commitRow(row)
+    local typed = ns.trim(row.editBox:GetText())
+
+    -- Enter on an empty row hands the keyboard back, and on a cleared rule removes it.
+    if typed == "" then
+        if row.saved then deleteRow(row) else row.editBox:ClearFocus() end
+        return
+    end
+    if not ns.hasTerm(typed) then
+        UI.Print(ns.TITLE, ns.NO_TERM)
+        return
+    end
+    local lower = typed:lower()
+    for _, other in ipairs(KeywordRows.active) do
+        if other ~= row and other.saved and other.saved:lower() == lower then
+            UI.Print(ns.TITLE, "Already tracking: " .. other.saved .. ".")
+            return
+        end
+    end
+    local isNew = row.saved == nil
+    row.saved = typed
+    row.editBox:SetText(typed)
+    row.editBox:ClearFocus()
+    row:UpdateState()
+    persistKeywords()
+    panel:RefreshKeywords()
+
+    -- The caret moves on to the fresh trailing row, so rules can be typed one after another.
+    if isNew then KeywordRows.active[#KeywordRows.active].editBox:SetFocus() end
+    if not Scanner.scanning then Scanner.Start() end
 end
 
 -- An empty row shows no button, a typed row shows Add, a saved and unchanged row shows remove.
@@ -257,7 +275,7 @@ local function createKeywordRow(parent)
     editBox:SetMaxLetters(256)
     row.editBox = editBox
 
-    local addBtn = UI.CreateButton(row, "Add", ADD_W)
+    local addBtn = UI.CreateButton(row, ADD)
     addBtn:SetPoint("RIGHT")
 
     local removeBtn = UI.CreateRemoveButton(row)
@@ -345,49 +363,58 @@ local function createColumns(frame)
     return left, right
 end
 
--- The alert toggle, a sound picker that previews each pick, and a Test button. Returns the toggle,
--- the picker and the height they use.
-local function createSoundControls(content)
-    local soundCheck = UI.CreateCheckbox(content, "Play sound on match")
-    soundCheck:SetPoint("TOPLEFT")
-    soundCheck:SetScript("OnClick", function(self)
-        Store.Get().playSound = self:GetChecked()
-    end)
-
-    local soundDropdown = UI.CreateDropdown(content)
-    soundDropdown:SetPoint("TOPLEFT", soundCheck, "BOTTOMLEFT", 0, -UI.Space.gap)
-    soundDropdown:SetDefaultText("Choose a sound")
-    soundDropdown:SetupMenu(function(_, root)
-        for _, sound in ipairs(ns.SOUNDS) do
-            root:CreateRadio(sound.name,
-                function() return Store.Get().soundId == sound.id end,
-                function()
-                    Store.Get().soundId = sound.id
-                    PlaySound(sound.id)
-                end)
-        end
-    end)
-
-    local testBtn = UI.CreateButton(content, "Test", TEST_W)
-    testBtn:SetPoint("LEFT", soundDropdown, "RIGHT", UI.Space.gap, 0)
-    testBtn:SetScript("OnClick", function() PlaySound(Store.Get().soundId) end)
-
-    -- The dropdown keeps the template's own height, so its slot is snapped to the grid.
-    return soundCheck, soundDropdown, UI.Size.row + UI.Space.gap + UI.Snap(soundDropdown:GetHeight())
+-- A pick previews its sound, so no Test button is needed. None turns the alert off.
+local function addSoundRadio(root, name, id)
+    root:CreateRadio(name,
+        function() return Store.Get().soundId == id end,
+        function()
+            Store.Get().soundId = id
+            if id ~= ns.NO_SOUND then PlaySound(id, ns.SOUND_CHANNEL) end
+        end)
 end
 
--- The live status sits in the attic, right of the portrait and centred between title bar and wells.
-local function createStatusLine(frame, right)
-    local status = UI.CreateText(frame, "body")
-    status:SetPoint("TOPLEFT", frame.TitleContainer, "BOTTOMLEFT")
-    status:SetPoint("BOTTOMRIGHT", right, "TOPRIGHT")
-    status:SetJustifyV("MIDDLE")
+-- One sound picker. Its art hangs past both sides, so it is indented by that much.
+local function createSoundDropdown(content)
+    local dropdown = UI.CreateDropdown(content)
+    dropdown:SetPoint("TOPLEFT", UI.Native.dropdownArt, 0)
+    dropdown:SetupMenu(function(_, root)
+        addSoundRadio(root, NONE, ns.NO_SOUND)
+        for _, sound in ipairs(ns.SOUNDS) do addSoundRadio(root, sound.name, sound.id) end
+    end)
+    return dropdown
+end
+
+-- The live status sits in an inset that fills the button bar left of the start button, so the state
+-- reads next to the control that changes it. The inset takes the bar's own corner offset and the
+-- button's height.
+local function createStatus(frame, startBtn)
+    local box = UI.CreateInset(frame)
+    box:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", PANEL_INSET_LEFT_OFFSET, PANEL_INSET_BOTTOM_OFFSET)
+    box:SetPoint("TOPRIGHT", startBtn, "TOPLEFT", -UI.Space.gap, 0)
+
+    local status = UI.CreateText(box, "body")
+    status:SetPoint("LEFT", UI.Space.gap, 0)
+    status:SetPoint("RIGHT", -UI.Space.gap, 0)
+    status:SetWordWrap(false)
     return status
 end
 
--- Events that change the channel or community stream lists while the panel is open.
+-- On first use a fresh character has nothing ticked, so the channels joined right now are ticked.
+-- Channels can still be joining at login and community channels stay hidden in chat lockdown, so
+-- the seed waits until there is a channel and lockdown is over. /cs <rule> calls it too.
+function ns.SeedChannels()
+    local store = Store.Get()
+    if store.channelsSeeded or C_ChatInfo.InChatMessagingLockdown() then return end
+    local entries = channelEntries()
+    if #entries == 0 then return end
+    store.channelsSeeded = true
+    if next(store.inputChannels) then return end
+    for _, entry in ipairs(entries) do store.inputChannels[entry.key] = true end
+end
+
+-- Events that change the channel or output tab lists while the window is open.
 local LIST_EVENTS = {
-    "CHANNEL_UI_UPDATE", "CHAT_MSG_CHANNEL_NOTICE",
+    "CHANNEL_UI_UPDATE", "CHAT_MSG_CHANNEL_NOTICE", "UPDATE_CHAT_WINDOWS", "UPDATE_FLOATING_CHAT_WINDOWS",
     "CLUB_ADDED", "CLUB_REMOVED", "CLUB_UPDATED", "CLUB_STREAMS_LOADED", "CLUB_STREAM_ADDED",
     "CLUB_STREAM_REMOVED", "CLUB_STREAM_UPDATED", "CLUB_STREAM_SUBSCRIBED", "CLUB_STREAM_UNSUBSCRIBED",
 }
@@ -395,74 +422,70 @@ local LIST_EVENTS = {
 local function buildPanel()
     local frame = UI.CreateWindow({
         name = "ChatScanFrame", title = ns.TITLE, icon = ns.ICON,
-        width = PANEL_W, height = PANEL_H,
+        width = PANEL_W, height = PANEL_H, position = Store.Window(), attic = false,
     })
     local left, right = createColumns(frame)
     local leftScroll, rightScroll = createWellScroll(left), createWellScroll(right)
 
-    local channelsSection = createSection(leftScroll.content, "Scanned Channels",
-        "Pick which chat channels to scan. Zone channels stay selected when you change zones.")
-    local streamsSection = createSection(leftScroll.content, "Community Streams",
-        "Community streams that are in none of your chat tabs. A stream in a chat tab is listed under Scanned Channels.")
     local keywordsSection = createSection(leftScroll.content, "Keywords",
-        "Each row matches on its own (OR). Separate keywords in one row with commas to require all of them (AND). Press Enter or Add to save a row.")
-    local chatTypesSection = createSection(rightScroll.content, "Chat Types",
-        "Pick which chat outside the channels to scan.")
+        "One rule per row. Commas require every word.")
+    local channelsSection = createSection(leftScroll.content, CHANNELS)
+    local chatTypesSection = createSection(rightScroll.content, "Chat Types")
     local outputsSection = createSection(rightScroll.content, "Output Tabs",
-        "Pick which chat tabs receive matches. With none selected, matches go to the default chat frame.")
-    local soundSection = createSection(rightScroll.content, "Alert Sound",
-        "Play a sound when a keyword matches, at most once every 3 seconds.")
-    local leftSections = { channelsSection, streamsSection, keywordsSection }
+        "None picked: your main chat tab.")
+    local soundSection = createSection(rightScroll.content, SOUND)
+    local leftSections = { keywordsSection, channelsSection }
     local rightSections = { chatTypesSection, outputsSection, soundSection }
     stackSections(leftSections)
     stackSections(rightSections)
 
-    local channelList = createCheckList(channelsSection.content, "Not in any channels")
-    local streamList = createCheckList(streamsSection.content, "")
-    local outputList = createCheckList(outputsSection.content, "No chat tabs available")
+    local channelList = createCheckList(channelsSection.content, "Not in any channel.")
+    local outputList = createCheckList(outputsSection.content, "No chat tabs open.")
     local chatChecks, chatTypesH = createChatTypeGrid(chatTypesSection.content, function(key, checked)
         Store.Get().chatTypes[key] = checked or nil
         frame:RefreshStatus()
     end)
-    local soundCheck, soundDropdown, soundH = createSoundControls(soundSection.content)
-    local status = createStatusLine(frame, right)
+    local soundDropdown = createSoundDropdown(soundSection.content)
 
-    -- The primary action takes the button bar's bottom-right corner.
-    local startBtn = UI.AddBarButton(frame, "Start", function()
-        if Scanner.scanning then Scanner.Stop() else Scanner.Start() end
-    end)
+    -- The dropdown keeps the template's own height in a grid slot that also holds its art below.
+    local soundH = UI.Snap(UI.Native.dropdownHeight + DROPDOWN_ART_BELOW)
+
+    -- The primary action takes the button bar's bottom-right corner, the status the rest of the bar.
+    local startBtn = UI.AddBarButton(frame, START, Scanner.Toggle)
+    local status = createStatus(frame, startBtn)
 
     -- The button label and the status line show whether a scan runs.
     function frame:RefreshStatus()
-        local count = ns.matchLabel(Scanner.matchCount)
+        local count = ns.countLabel(Scanner.matchCount, "match", "matches")
         if Scanner.scanning then
             startBtn:SetText("Stop")
             -- A running scan can be unable to match while the client withholds chat text, or once
             -- every keyword or source is gone.
             if Scanner.chatLocked then
-                status:SetText(UI.Color.warn:WrapTextInColorCode("Chat locked by client") .. "  matching paused")
+                status:SetText(UI.Color.warn:WrapTextInColorCode("Chat locked") .. ", matching paused")
             elseif not Scanner.CanMatch() then
-                status:SetText(UI.Color.warn:WrapTextInColorCode("Nothing to match") .. "  add a keyword and tick a source")
+                status:SetText(UI.Color.warn:WrapTextInColorCode("Nothing to match") .. ", add a keyword and tick a channel or chat type")
             else
-                status:SetText(UI.Color.good:WrapTextInColorCode("Scanning") .. "  " .. count)
+                status:SetText(UI.Color.good:WrapTextInColorCode("Scanning") .. ", " .. count)
             end
         else
-            startBtn:SetText("Start")
+            startBtn:SetText(START)
             if Scanner.matchCount > 0 then
-                status:SetText(UI.Color.muted:WrapTextInColorCode("Stopped") .. "  " .. count .. " this session")
+                status:SetText(UI.Color.muted:WrapTextInColorCode("Stopped") .. ", " .. count .. " this session")
+            elseif #Store.Get().keywords == 0 then
+                status:SetText(UI.Color.muted:WrapTextInColorCode("Not scanning") .. ", add a keyword to start")
             else
                 status:SetText(UI.Color.muted:WrapTextInColorCode("Not scanning"))
             end
         end
     end
 
-    local channelsH, streamsH, keywordsH, outputsH = UI.Size.row, UI.Size.row, UI.Size.row, UI.Size.row
+    local channelsH, keywordsH, outputsH = UI.Size.row, UI.Size.row, UI.Size.row
 
     -- The window keeps its height; each well's scroll child follows its re-rendered lists.
     function frame:LayoutWells()
-        channelsSection:Layout(channelsH)
-        streamsSection:Layout(streamsH)
         keywordsSection:Layout(keywordsH)
+        channelsSection:Layout(channelsH)
         chatTypesSection:Layout(chatTypesH)
         outputsSection:Layout(outputsH)
         soundSection:Layout(soundH)
@@ -470,9 +493,9 @@ local function buildPanel()
         fitScroll(rightScroll, rightSections)
     end
 
-    -- Channels and community streams render together, because a stream moves from one list to the
-    -- other when it joins or leaves a chat tab. Stream data is secret in chat lockdown, so the
-    -- stream list says so instead.
+    -- Joined channels, then community streams outside every chat tab, in one list. Both share the
+    -- channel-name key, so a stream keeps its tick when it joins or leaves a chat tab. Stream data
+    -- is secret in chat lockdown, so streams drop out of the list until it ends.
     function frame:RefreshChannels()
         local channels = Store.Get().inputChannels
         local function isChecked(entry) return channels[entry.key] end
@@ -480,11 +503,12 @@ local function buildPanel()
             channels[entry.key] = checked or nil
             self:RefreshStatus()
         end
-        channelsH = channelList:Render(channelEntries(), isChecked, onClick)
-
-        local locked = C_ChatInfo.InChatMessagingLockdown()
-        streamList:SetEmptyText(locked and "Hidden while chat is locked" or "No other community streams")
-        streamsH = streamList:Render(locked and {} or streamEntries(), isChecked, onClick)
+        ns.SeedChannels()
+        local entries = channelEntries()
+        if not C_ChatInfo.InChatMessagingLockdown() then
+            for _, entry in ipairs(streamEntries()) do entries[#entries + 1] = entry end
+        end
+        channelsH = channelList:Render(entries, isChecked, onClick)
         self:LayoutWells()
     end
 
@@ -511,9 +535,8 @@ local function buildPanel()
         self:RefreshKeywords()
     end
 
-    -- The channel and stream lists stay live while the panel is open.
+    -- The channel and output tab lists stay live while the window is open.
     frame:SetScript("OnShow", function(self)
-        soundCheck:SetChecked(Store.Get().playSound)
         soundDropdown:GenerateMenu()
         self:RefreshChannels()
         self:RefreshChatTypes()
@@ -533,6 +556,7 @@ local function buildPanel()
     end)
     frame:SetScript("OnEvent", function(self)
         self:RefreshChannels()
+        self:RefreshOutputs()
     end)
 
     Scanner.OnChanged(function()

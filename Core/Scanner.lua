@@ -25,14 +25,22 @@ local function fireChanged()
     for _, callback in ipairs(listeners) do callback() end
 end
 
--- One row is an OR group; commas inside a row separate AND terms. Terms are lowercased once here.
+-- A term matches where a word starts, so "lf" finds "LFG" and "LF1M" but not "self". A term that
+-- opens with punctuation or a non-ASCII letter has no word start to anchor to and matches anywhere.
+local function termPattern(term)
+    local escaped = term:gsub("%p", "%%%0")
+    if term:find("^%w") then return "%f[%w]" .. escaped end
+    return escaped
+end
+
+-- One row is an OR group; commas inside a row separate AND terms. Patterns are built once here.
 function Scanner.ReloadKeywords()
     keywordGroups = {}
     for _, row in ipairs(ns.Store.Get().keywords) do
         local terms = {}
         for raw in row:gmatch("[^,]+") do
             local term = ns.trim(raw)
-            if term ~= "" then terms[#terms + 1] = strlower(term) end
+            if term ~= "" then terms[#terms + 1] = termPattern(strlower(term)) end
         end
         if #terms > 0 then keywordGroups[#keywordGroups + 1] = terms end
     end
@@ -44,7 +52,7 @@ local function matchesKeywords(text)
     for _, terms in ipairs(keywordGroups) do
         local all = true
         for _, term in ipairs(terms) do
-            if not strfind(lower, term, 1, true) then
+            if not strfind(lower, term) then
                 all = false
                 break
             end
@@ -100,29 +108,37 @@ local function deliver(line, r, g, b, id)
     if not delivered then DEFAULT_CHAT_FRAME:AddMessage(line, r, g, b, id) end
 end
 
--- Only the time stamp in front is ChatScan's own; the rest of the line is Blizzard's.
+-- Blizzard's chat timestamp when the player turned it on, otherwise a grey [HH:MM], so a forwarded
+-- line always says when it was sent.
+local function timestamp()
+    local format = ChatFrameUtil.GetTimestampFormat()
+    if format then return TimeUtil.BetterDate(format, time()) end
+    return UI.Color.muted:WrapTextInColorCode("[" .. date("%H:%M") .. "]") .. " "
+end
+
+-- Only the timestamp in front is ChatScan's own; the rest of the line is Blizzard's.
 local function forward(line, r, g, b, id)
-    local stamp = UI.Color.muted:WrapTextInColorCode("[" .. date("%H:%M") .. "]")
-    deliver(stamp .. " " .. line, r, g, b, id)
+    deliver(timestamp() .. line, r, g, b, id)
 
     Scanner.matchCount = Scanner.matchCount + 1
     fireChanged()
 
     local store = ns.Store.Get()
     local now = GetTime()
-    if store.playSound and now - lastSoundTime >= ns.SOUND_THROTTLE then
-        PlaySound(store.soundId)
+    if store.soundId ~= ns.NO_SOUND and now - lastSoundTime >= ns.SOUND_THROTTLE then
+        PlaySound(store.soundId, ns.SOUND_CHANNEL)
         lastSoundTime = now
     end
 end
 
-local LOCKDOWN_NOTICE = "The client is withholding chat text from addons (chat messaging lockdown), so keyword matching is paused. Your settings are fine."
+local LOCKDOWN_NOTICE = "Chat is locked here, matching paused."
 
--- Announced once per transition, so a long lockdown never floods chat but never fails silently.
+-- Announced once when a lockdown starts, so it never fails silently. Its end shows in the status
+-- line and the tooltip.
 local function setChatLocked(locked)
     if Scanner.chatLocked == locked then return end
     Scanner.chatLocked = locked
-    UI.Print(ns.TITLE, locked and LOCKDOWN_NOTICE or "Chat text is readable again, scanning resumed.")
+    if locked then UI.Print(ns.TITLE, LOCKDOWN_NOTICE) end
     fireChanged()
 end
 
@@ -176,8 +192,9 @@ local function onClubMessage(clubId, streamId, messageId)
     local localID = ChatFrameUtil.GetCommunitiesChannelLocalID(clubId, streamId)
     if (localID and localID ~= 0) or not canRead() then return end
 
+    -- Battle.net community text can arrive as a protected |K string that matching cannot read.
     local message = C_Club.GetMessageInfo(clubId, streamId, messageId)
-    if not message or message.destroyed then return end
+    if not message or message.destroyed or message.content:find("^|K") then return end
     local author = message.author.name or ""
     if matchesKeywords(message.content) and not isDuplicate(author, message.content) then
         forward(ns.Lines.Stream(clubId, streamId, message))
@@ -213,7 +230,7 @@ function Scanner.CanMatch()
     return #keywordGroups > 0 and countSources() > 0
 end
 
--- Starts from saved settings. A resume after login or reload stays quiet about missing settings.
+-- Starts from saved settings. A resume after login or reload stays quiet, so login adds no chat.
 local function begin(isResume)
     local store = ns.Store.Get()
     Scanner.ReloadKeywords()
@@ -223,9 +240,9 @@ local function begin(isResume)
         if isResume then
             store.scanEnabled = false
         elseif #keywordGroups == 0 then
-            UI.Print(ns.TITLE, "No keywords entered. Open the scan panel to configure.")
+            UI.Print(ns.TITLE, "Add a keyword first.")
         else
-            UI.Print(ns.TITLE, "No channels or chat types selected. Open the scan panel to configure.")
+            UI.Print(ns.TITLE, "Tick a channel or chat type first.")
         end
         return
     end
@@ -240,16 +257,23 @@ local function begin(isResume)
     Scanner.scanning = true
     Scanner.matchCount = 0
     store.scanEnabled = true
-    UI.Print(ns.TITLE, string.format("Scanning %d source(s) for %d keyword group(s).", sources, #keywordGroups))
 
     -- Surfaced at start, so a scan that cannot match never looks healthy.
     Scanner.chatLocked = C_ChatInfo.InChatMessagingLockdown()
-    if Scanner.chatLocked then UI.Print(ns.TITLE, LOCKDOWN_NOTICE) end
+    if not isResume then
+        UI.Print(ns.TITLE, Scanner.chatLocked and LOCKDOWN_NOTICE or string.format("Scanning %s for %s.",
+            ns.countLabel(sources, "source", "sources"), ns.countLabel(#keywordGroups, "rule", "rules")))
+    end
     fireChanged()
 end
 
 function Scanner.Start()
     begin(false)
+end
+
+-- The start button and the minimap button's right-click share this.
+function Scanner.Toggle()
+    if Scanner.scanning then Scanner.Stop() else Scanner.Start() end
 end
 
 function Scanner.Resume()
