@@ -5,6 +5,7 @@
 ## Version: @project-version@
 ## Category: Chat
 ## IconTexture: Interface\Icons\inv_professions_inscription_scribesmagnifyingglass_silver
+## X-Curse-Project-ID: 1785966
 ## SavedVariables: ChatScanDB
 ## SavedVariablesPerCharacter: ChatScanCharDB
 
