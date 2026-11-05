@@ -5,7 +5,7 @@ local _, ns = ...
 ns.TITLE = "Chat Scan"
 
 -- The same icon as the toc's IconTexture.
-ns.ICON = "Interface\\Icons\\INV_Misc_Spyglass_03"
+ns.ICON = "Interface\\Icons\\inv_professions_inscription_scribesmagnifyingglass_silver"
 
 -- Trade posts repeat every 30 to 90 seconds, so a repeat within 2 minutes is shown once.
 ns.DEDUP_TTL = 120

@@ -4,7 +4,7 @@
 ## Author: miyanko
 ## Version: 1.0.0
 ## Category: Chat
-## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
+## IconTexture: Interface\Icons\inv_professions_inscription_scribesmagnifyingglass_silver
 ## SavedVariables: ChatScanDB
 ## SavedVariablesPerCharacter: ChatScanCharDB
 
