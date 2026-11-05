@@ -2,7 +2,7 @@
 ## Title: Chat Scan
 ## Notes: Forwards chat messages that match your keywords to the chat tabs you pick.
 ## Author: miyanko
-## Version: 1.0.0
+## Version: @project-version@
 ## Category: Chat
 ## IconTexture: Interface\Icons\inv_professions_inscription_scribesmagnifyingglass_silver
 ## SavedVariables: ChatScanDB
