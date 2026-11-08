@@ -95,6 +95,7 @@ function Region:SetWordWrap(on) self.wordWrap = on end
 function Region:GetTextColor() return 0.5, 0.5, 0.5 end
 function Region:SetTextColor(r, g, b) self.color = { r, g, b } end
 function Region:SetText(text) self.text = text end
+function Region:SetColorTexture(r, g, b, a) self.colorTexture = { r, g, b, a } end
 function Region:GetText() return self.text end
 function Region:GetStringWidth() return #(self.text or "") * CHAR_WIDTH end
 function Region:GetStringHeight()
@@ -114,8 +115,12 @@ end
 -- Blizzard template setup, reduced to the keys and sizes the library relies on.
 local templates = {}
 
+-- The rock tile and its title streaks, which UI.CreateWindow keeps, and the inset's marble tile, which it hides.
 templates.ButtonFrameTemplate = function(f)
+    f.Bg = newRegion("Texture", nil, f)
+    f.TopTileStreaks = newRegion("Texture", nil, f)
     f.Inset = newRegion("Frame", nil, f)
+    f.Inset.Bg = newRegion("Texture", nil, f.Inset)
     f.SetTitle = function(self, title) self.title = title end
     f.SetPortraitToAsset = function(self, asset) self.portrait = asset end
 end
@@ -151,7 +156,7 @@ end
 templates.InputBoxTemplate = function(f) f:SetSize(160, 20) end
 templates.SearchBoxTemplate = function(f) f.Instructions = f:CreateFontString() end
 templates.WowStyle1DropdownTemplate = function(f) f:SetSize(120, 25) end
-templates.InsetFrameTemplate = function() end
+templates.InsetFrameTemplate = function(f) f.Bg = newRegion("Texture", nil, f) end
 templates.MinimalSliderWithSteppersTemplate = function(f) f:SetSize(250, 40) end
 templates.ScrollFrameTemplate = function() end
 
@@ -239,7 +244,7 @@ local function isEscapable(name)
 end
 
 -- Tokens
-check("MINOR is 3", minor == 3, minor)
+check("MINOR is 5", minor == 5, minor)
 check("grid is 4", UI.GRID == 4 and UI.Snap(22) == 24 and UI.Snap(36) == 36)
 check("space tokens", UI.Space.tight == 4 and UI.Space.gap == 8 and UI.Space.padding == 16
     and UI.Space.section == 24 and UI.Space.dialog == 20 and UI.Space.dialogTop == 40)
@@ -259,6 +264,10 @@ local window = UI.CreateWindow({ name = "SmokeWindow", title = "Smoke Window", i
     width = 480, height = 400, position = position })
 check("window is a ButtonFrameTemplate", window.template == "ButtonFrameTemplate")
 check("window title and portrait", window.title == "Smoke Window" and window.portrait == 134400)
+check("window keeps its stone, the inset only its border", window.Bg.colorTexture == nil
+    and window.TopTileStreaks.shown and not window.Inset.Bg.shown)
+local inset = UI.CreateInset(window)
+check("an inset keeps only its border", inset.template == "InsetFrameTemplate" and not inset.Bg.shown)
 check("window on HIGH strata, toplevel and clamped", window.strata == "HIGH" and window.toplevel and window.clamped)
 check("window starts hidden", window.shown == false)
 check("Escape closes the window", isEscapable("SmokeWindow"))
