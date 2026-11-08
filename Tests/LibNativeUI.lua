@@ -64,6 +64,13 @@ function Region:GetWidth() return self.width end
 function Region:GetHeight() return self.height end
 function Region:GetName() return self.name end
 function Region:ClearAllPoints() self.points = {} end
+function Region:SetAllPoints(rel) self.allPoints = rel end
+function Region:SetAtlas(atlas, useAtlasSize) self.atlas, self.useAtlasSize = atlas, useAtlasSize end
+function Region:CreateTexture(name, layer)
+    local texture = newRegion("Texture", name, self)
+    texture.layer = layer
+    return texture
+end
 function Region:SetPoint(point, rel, relPoint, x, y)
     if type(rel) == "number" then rel, relPoint, x, y = nil, nil, rel, relPoint end
     self.points[#self.points + 1] = { point = point, rel = rel, relPoint = relPoint, x = x or 0, y = y or 0 }
@@ -115,12 +122,14 @@ end
 -- Blizzard template setup, reduced to the keys and sizes the library relies on.
 local templates = {}
 
--- The rock tile and its title streaks, which UI.CreateWindow keeps, and the inset's marble tile, which it hides.
+-- The rock tile and its title streaks, which UI.CreateWindow keeps, and the inset's marble tile and
+-- border, which it hides for the brown panel.
 templates.ButtonFrameTemplate = function(f)
     f.Bg = newRegion("Texture", nil, f)
     f.TopTileStreaks = newRegion("Texture", nil, f)
     f.Inset = newRegion("Frame", nil, f)
     f.Inset.Bg = newRegion("Texture", nil, f.Inset)
+    f.Inset.NineSlice = newRegion("Frame", nil, f.Inset)
     f.SetTitle = function(self, title) self.title = title end
     f.SetPortraitToAsset = function(self, asset) self.portrait = asset end
 end
@@ -156,7 +165,18 @@ end
 templates.InputBoxTemplate = function(f) f:SetSize(160, 20) end
 templates.SearchBoxTemplate = function(f) f.Instructions = f:CreateFontString() end
 templates.WowStyle1DropdownTemplate = function(f) f:SetSize(120, 25) end
-templates.InsetFrameTemplate = function(f) f.Bg = newRegion("Texture", nil, f) end
+templates.InsetFrameTemplate = function(f)
+    f.Bg = newRegion("Texture", nil, f)
+    f.NineSlice = newRegion("Frame", nil, f)
+end
+-- An inset with the collections tile, its shadow and four corner ornaments (SharedCollectionTemplates.xml).
+templates.CollectionsBackgroundTemplate = function(f)
+    templates.InsetFrameTemplate(f)
+    f.BackgroundTile = newRegion("Texture", nil, f)
+    for _, corner in ipairs({ "BGCornerTopLeft", "BGCornerTopRight", "BGCornerBottomLeft", "BGCornerBottomRight" }) do
+        f[corner] = newRegion("Texture", nil, f)
+    end
+end
 templates.MinimalSliderWithSteppersTemplate = function(f) f:SetSize(250, 40) end
 templates.ScrollFrameTemplate = function() end
 
@@ -201,6 +221,8 @@ function CreateFrame(kind, name, parent, template)
 end
 
 UIParent = CreateFrame("Frame", "UIParent")
+-- Blizzard's quarter turns swap a texture's size and texture coordinates (Blizzard_SharedXMLBase/TextureUtil.lua).
+function SetClampedTextureRotation(texture, degrees) texture.rotation = degrees end
 GameTooltip = CreateFrame("Frame", "GameTooltip")
 function GameTooltip_Hide() GameTooltip:Hide() end
 function GameTooltip_SetTitle(tooltip, text) tooltip.title = text end
@@ -244,7 +266,7 @@ local function isEscapable(name)
 end
 
 -- Tokens
-check("MINOR is 5", minor == 5, minor)
+check("MINOR is 6", minor == 6, minor)
 check("grid is 4", UI.GRID == 4 and UI.Snap(22) == 24 and UI.Snap(36) == 36)
 check("space tokens", UI.Space.tight == 4 and UI.Space.gap == 8 and UI.Space.padding == 16
     and UI.Space.section == 24 and UI.Space.dialog == 20 and UI.Space.dialogTop == 40)
@@ -264,10 +286,18 @@ local window = UI.CreateWindow({ name = "SmokeWindow", title = "Smoke Window", i
     width = 480, height = 400, position = position })
 check("window is a ButtonFrameTemplate", window.template == "ButtonFrameTemplate")
 check("window title and portrait", window.title == "Smoke Window" and window.portrait == 134400)
-check("window keeps its stone, the inset only its border", window.Bg.colorTexture == nil
-    and window.TopTileStreaks.shown and not window.Inset.Bg.shown)
+check("window keeps its stone around the content", window.Bg.colorTexture == nil and window.TopTileStreaks.shown)
+local background = window.Background
+check("the brown panel takes the inset's place, its corners hidden", background.template == "CollectionsBackgroundTemplate"
+    and background.parent == window and background.allPoints == window.Inset and background.NineSlice.shown
+    and not background.BGCornerTopLeft.shown and not background.BGCornerBottomRight.shown and background.BackgroundTile.shown)
+check("the inset stays the content parent and draws nothing", window.Inset.shown and not window.Inset.Bg.shown
+    and not window.Inset.NineSlice.shown)
 local inset = UI.CreateInset(window)
-check("an inset keeps only its border", inset.template == "InsetFrameTemplate" and not inset.Bg.shown)
+check("an inset keeps only its border", inset.template == "InsetFrameTemplate" and not inset.Bg.shown and inset.NineSlice.shown)
+local divider = UI.CreateVerticalDivider(background)
+check("the divider is the gold Settings line stood on end", divider.atlas == "Options_HorizontalDivider"
+    and divider.useAtlasSize and divider.rotation == 90 and divider.layer == "ARTWORK" and divider.parent == background)
 check("window on HIGH strata, toplevel and clamped", window.strata == "HIGH" and window.toplevel and window.clamped)
 check("window starts hidden", window.shown == false)
 check("Escape closes the window", isEscapable("SmokeWindow"))
