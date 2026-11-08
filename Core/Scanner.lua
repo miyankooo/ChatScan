@@ -173,10 +173,12 @@ end
 -- and Blizzard's letterbox rule use NeverSecret fields only, so they run first and the rest is read
 -- outside lockdown. Guild Discord is gated the same, so one lockdown rule covers every source.
 -- Matching relies on the lockdown check alone; an extra issecretvalue guard on the text waits for
--- an in-game check.
+-- an in-game check. A line Blizzard's chat hides as censored is never forwarded, so its text stays
+-- hidden; lineID is NeverSecret.
 local function onChatMessage(event, ...)
     local hideSender = select(16, ...)
     if hideSender or not isTicked(event, ...) or not canRead() then return end
+    if C_ChatInfo.IsChatLineCensored(select(11, ...)) then return end
 
     local msg, sender = ...
     if matchesKeywords(msg) and not isDuplicate(sender, msg) then forward(ns.Lines.Chat(event, ...)) end

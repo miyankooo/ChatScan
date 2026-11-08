@@ -50,7 +50,12 @@ function CreateFrame()
     return frame
 end
 
-C_ChatInfo = { InChatMessagingLockdown = function() return false end }
+-- Line 99 stands for a line Blizzard's chat hides as censored.
+local CENSORED_LINE = 99
+C_ChatInfo = {
+    InChatMessagingLockdown = function() return false end,
+    IsChatLineCensored = function(lineID) return lineID == CENSORED_LINE end,
+}
 ChatFrameUtil = { GetTimestampFormat = function() return nil end }
 Constants = { ChatFrameConstants = { MaxChatWindows = 10 } }
 function GetChatWindowInfo(i) return i == 1 and "General" or "" end
@@ -129,6 +134,16 @@ check("a term opening with punctuation matches anywhere", matches("kill{skull}fi
 
 rules("lf+")
 check("pattern characters in a term are literal", matches("lf+ anyone") and not matches("lff anyone"))
+
+-- Censored lines: the payload's 11th field is the lineID
+rules("censored")
+local function sayLine(text, lineID)
+    local before = #delivered
+    eventFrame.onEvent(eventFrame, "CHAT_MSG_SAY", text, "Censor-Realm", "", "", "", "", 0, 0, "", 0, lineID)
+    return #delivered > before
+end
+check("a censored line is not forwarded", not sayLine("censored wts", CENSORED_LINE))
+check("an uncensored line with a lineID forwards", sayLine("censored wtb", 100))
 
 -- Dedupe: the same sender and text forward once per 2 minutes
 rules("dedupe")
