@@ -1,8 +1,8 @@
-local _, ns = ...
+local addonName, ns = ...
 
--- Spaced name for everything the player reads: the window title, the chat prefix and the
--- launcher, whose LibDataBroker name it also is.
-ns.TITLE = "Chat Scan"
+-- The toc Title names the addon in chat, the window and the launcher, whose LibDataBroker name it
+-- also is.
+ns.title = C_AddOns.GetAddOnMetadata(addonName, "Title")
 
 -- The same icon as the toc's IconTexture.
 ns.ICON = "Interface\\Icons\\inv_professions_inscription_scribesmagnifyingglass_silver"
@@ -58,6 +58,22 @@ ns.CHAT_GROUPS = {
 
 -- ChatFrame2 is always reset and docked as the combat log, so it never receives forwarded lines.
 ns.COMBAT_LOG_INDEX = 2
+
+-- Every chat line goes through here: the bracketed title in NORMAL_FONT_COLOR, the gold of Blizzard's
+-- own chat links, then the message in the chat frame's own colour.
+function ns.Print(message)
+    print(NORMAL_FONT_COLOR:WrapTextInColorCode("[" .. ns.title .. "]") .. ": " .. message)
+end
+
+-- canaccessvalue is SecretArguments = "AllowedWhenUntainted" (FrameScriptDocumentation.lua), so
+-- tainted addon code handing it a secret may raise instead of answering; the pcall turns that raise
+-- into "not accessible", the only safe reading. nil is never secret, so it is answered without the
+-- call, through type().
+function ns.CanAccess(value)
+    if type(value) == "nil" then return true end
+    local ok, accessible = pcall(canaccessvalue, value)
+    return ok and accessible == true
+end
 
 function ns.countLabel(count, one, many)
     return string.format("%d %s", count, count == 1 and one or many)

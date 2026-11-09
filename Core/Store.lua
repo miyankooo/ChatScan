@@ -9,9 +9,13 @@ local store
 -- a name key. ChatScanDB holds only what every character shares: the minimap button and the window
 -- position. Channels and community streams share inputChannels, keyed by channel name; chatTypes
 -- holds CHAT_GROUPS keys. soundId ns.NO_SOUND turns the alert off. channelsSeeded marks that the
--- joined channels were ticked once on first use.
+-- joined channels were ticked once on first use. An absent account table is the account's first
+-- load, which earns the one welcome line (UI/Welcome.lua); tipSeen marks the Keywords tip as done.
 function Store.Init()
-    ChatScanDB = ChatScanDB or {}
+    if type(ChatScanDB) ~= "table" then
+        ChatScanDB = {}
+        ns.firstRun = true
+    end
     ChatScanDB.minimap = ChatScanDB.minimap or { hide = false, minimapPos = 195 }
     ChatScanDB.window = ChatScanDB.window or {}
 
@@ -37,4 +41,9 @@ end
 
 function Store.Window()
     return ChatScanDB.window
+end
+
+-- The account-wide table, for the onboarding flags.
+function Store.Account()
+    return ChatScanDB
 end

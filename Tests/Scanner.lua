@@ -33,11 +33,9 @@ local sounds = {}
 function PlaySound(id, channel) sounds[#sounds + 1] = { id = id, channel = channel } end
 
 local printed = {}
-local UI = {
-    Print = function(_, message) printed[#printed + 1] = message end,
-    Color = { muted = { WrapTextInColorCode = function(_, text) return text end } },
-}
-function LibStub() return UI end
+C_AddOns = { GetAddOnMetadata = function() return "Chat Scan" end }
+GRAY_FONT_COLOR = { WrapTextInColorCode = function(_, text) return text end }
+SlashCmdList = {}
 
 -- The event frame keeps its handler, so the test can fire events at it.
 local eventFrame
@@ -75,6 +73,8 @@ local function load(path)
 end
 
 load("Core/Init.lua")
+-- Chat lines are checked by their message, without the gold title in front.
+ns.Print = function(message) printed[#printed + 1] = message end
 load("Core/Store.lua")
 ns.Lines = { Chat = function(_, msg) return msg, 1, 1, 1, 1 end }
 load("Core/Scanner.lua")
@@ -189,11 +189,12 @@ check("a start in lockdown prints one line", #printed == 1 and printed[1] == "Ch
     table.concat(printed, " | "))
 lockdown = false
 
-local slash, seeded = nil, 0
-UI.RegisterSlash = function(_, _, handler) slash = handler end
+local seeded = 0
 ns.RefreshPanel = function() end
+ns.RetireKeywordTip = function() end
 ns.SeedChannels = function() seeded = seeded + 1 end
 load("Core/Commands.lua")
+local slash = SlashCmdList.CHATSCAN
 
 ns.Scanner.Stop()
 store.keywords = {}

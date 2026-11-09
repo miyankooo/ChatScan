@@ -1,7 +1,5 @@
 local _, ns = ...
 
-local UI = LibStub("LibNativeUI-1.0")
-
 local Scanner = {
     scanning = false,
     matchCount = 0,
@@ -113,7 +111,7 @@ end
 local function timestamp()
     local format = ChatFrameUtil.GetTimestampFormat()
     if format then return TimeUtil.BetterDate(format, time()) end
-    return UI.Color.muted:WrapTextInColorCode("[" .. date("%H:%M") .. "]") .. " "
+    return GRAY_FONT_COLOR:WrapTextInColorCode("[" .. date("%H:%M") .. "]") .. " "
 end
 
 -- Only the timestamp in front is ChatScan's own; the rest of the line is Blizzard's.
@@ -138,7 +136,7 @@ local LOCKDOWN_NOTICE = "Chat is locked here, matching paused."
 local function setChatLocked(locked)
     if Scanner.chatLocked == locked then return end
     Scanner.chatLocked = locked
-    if locked then UI.Print(ns.TITLE, LOCKDOWN_NOTICE) end
+    if locked then ns.Print(LOCKDOWN_NOTICE) end
     fireChanged()
 end
 
@@ -242,9 +240,9 @@ local function begin(isResume)
         if isResume then
             store.scanEnabled = false
         elseif #keywordGroups == 0 then
-            UI.Print(ns.TITLE, "Add a keyword first.")
+            ns.Print("Add a keyword first.")
         else
-            UI.Print(ns.TITLE, "Tick a channel or chat type first.")
+            ns.Print("Tick a channel or chat type first.")
         end
         return
     end
@@ -263,7 +261,7 @@ local function begin(isResume)
     -- Surfaced at start, so a scan that cannot match never looks healthy.
     Scanner.chatLocked = C_ChatInfo.InChatMessagingLockdown()
     if not isResume then
-        UI.Print(ns.TITLE, Scanner.chatLocked and LOCKDOWN_NOTICE or string.format("Scanning %s for %s.",
+        ns.Print(Scanner.chatLocked and LOCKDOWN_NOTICE or string.format("Scanning %s for %s.",
             ns.countLabel(sources, "source", "sources"), ns.countLabel(#keywordGroups, "rule", "rules")))
     end
     fireChanged()
@@ -287,6 +285,6 @@ function Scanner.Stop()
     Scanner.scanning = false
     Scanner.chatLocked = false
     ns.Store.Get().scanEnabled = false
-    UI.Print(ns.TITLE, "Scan stopped.")
+    ns.Print("Scan stopped.")
     fireChanged()
 end
