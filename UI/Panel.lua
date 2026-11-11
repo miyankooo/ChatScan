@@ -3,7 +3,7 @@ local _, ns = ...
 local Scanner = ns.Scanner
 local Store = ns.Store
 
--- Spacing roles and component sizes from the shared design system, all on the 4 px grid.
+-- Spacing roles and component sizes, all on the 4 px grid.
 local GAP = 8
 local PADDING = 16
 local SECTION = 24
