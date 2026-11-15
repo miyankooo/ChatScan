@@ -42,6 +42,7 @@ local eventFrame
 function CreateFrame()
     local frame = { events = {} }
     function frame:RegisterEvent(event) self.events[event] = true end
+    function frame:UnregisterEvent(event) self.events[event] = nil end
     function frame:UnregisterAllEvents() self.events = {} end
     function frame:SetScript(_, fn) self.onEvent = fn end
     eventFrame = frame
@@ -105,6 +106,22 @@ end
 rules("lf")
 ns.Scanner.Start()
 check("start announces sources and rules", printed[#printed] == "Scanning 1 source for 1 rule.", printed[#printed])
+
+-- Only the ticked sources' events are registered, and a tick mid-scan applies at once.
+check("a scan listens to the ticked chat type and the restriction event", eventFrame.events.CHAT_MSG_SAY
+    and eventFrame.events.ADDON_RESTRICTION_STATE_CHANGED and not eventFrame.events.CHAT_MSG_YELL
+    and not eventFrame.events.CHAT_MSG_CHANNEL and not eventFrame.events.CLUB_MESSAGE_ADDED)
+store.inputChannels.trade = true
+store.chatTypes.party = true
+ns.Scanner.RefreshEvents()
+check("a ticked channel adds the channel, community and club events", eventFrame.events.CHAT_MSG_CHANNEL
+    and eventFrame.events.CHAT_MSG_COMMUNITIES_CHANNEL and eventFrame.events.CLUB_MESSAGE_ADDED)
+check("a ticked chat type adds all of its events", eventFrame.events.CHAT_MSG_PARTY and eventFrame.events.CHAT_MSG_PARTY_LEADER)
+store.inputChannels.trade = nil
+store.chatTypes.party = nil
+ns.Scanner.RefreshEvents()
+check("unticking drops them again", not eventFrame.events.CHAT_MSG_CHANNEL and not eventFrame.events.CHAT_MSG_PARTY
+    and eventFrame.events.CHAT_MSG_SAY)
 
 -- Word-start matching
 check("lf matches LFG", matches("LFG tank for Deadmines"))
@@ -188,6 +205,13 @@ ns.Scanner.Start()
 check("a start in lockdown prints one line", #printed == 1 and printed[1] == "Chat is locked here, matching paused.",
     table.concat(printed, " | "))
 lockdown = false
+eventFrame.onEvent(eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
+check("the lockdown's end shows only in the status", not ns.Scanner.chatLocked and #printed == 1)
+lockdown = true
+eventFrame.onEvent(eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
+check("a later lockdown in the session prints nothing", ns.Scanner.chatLocked and #printed == 1, table.concat(printed, " | "))
+lockdown = false
+eventFrame.onEvent(eventFrame, "ADDON_RESTRICTION_STATE_CHANGED")
 
 local seeded = 0
 ns.RefreshPanel = function() end

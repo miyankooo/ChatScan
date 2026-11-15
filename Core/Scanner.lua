@@ -131,12 +131,19 @@ end
 
 local LOCKDOWN_NOTICE = "Chat is locked here, matching paused."
 
--- Announced once when a lockdown starts, so it never fails silently. Its end shows in the status
--- line and the tooltip.
+-- The first lockdown of a session is announced, so a paused scan never fails silently. Every dungeon
+-- and raid locks chat, so later lockdowns, and every end, show only in the status line and the tooltip.
+local lockdownAnnounced = false
+
+local function announceLockdown()
+    lockdownAnnounced = true
+    ns.Print(LOCKDOWN_NOTICE)
+end
+
 local function setChatLocked(locked)
     if Scanner.chatLocked == locked then return end
     Scanner.chatLocked = locked
-    if locked then ns.Print(LOCKDOWN_NOTICE) end
+    if locked and not lockdownAnnounced then announceLockdown() end
     fireChanged()
 end
 
@@ -230,6 +237,23 @@ function Scanner.CanMatch()
     return #keywordGroups > 0 and countSources() > 0
 end
 
+-- Channels and community streams share inputChannels, so any ticked one needs all three events.
+local CHANNEL_EVENTS = { "CHAT_MSG_CHANNEL", "CHAT_MSG_COMMUNITIES_CHANNEL", "CLUB_MESSAGE_ADDED" }
+
+local function setRegistered(event, registered)
+    if registered then eventFrame:RegisterEvent(event) else eventFrame:UnregisterEvent(event) end
+end
+
+-- A running scan listens only to the chat of ticked sources, so unticked chat, such as Say in a busy
+-- city, costs nothing. The window calls this after every tick, so a change applies at once.
+function Scanner.RefreshEvents()
+    if not Scanner.scanning then return end
+    local store = ns.Store.Get()
+    for event, key in pairs(chatTypeOf) do setRegistered(event, store.chatTypes[key]) end
+    local anyChannel = next(store.inputChannels) ~= nil
+    for _, event in ipairs(CHANNEL_EVENTS) do setRegistered(event, anyChannel) end
+end
+
 -- Starts from saved settings. A resume after login or reload stays quiet, so login adds no chat.
 local function begin(isResume)
     local store = ns.Store.Get()
@@ -247,22 +271,23 @@ local function begin(isResume)
         return
     end
 
-    -- Every source's event is registered, so ticks changed mid-scan apply at once. Community
-    -- channels (Community:<clubId>:<streamId>) arrive on their own event.
-    eventFrame:RegisterEvent("CHAT_MSG_CHANNEL")
-    eventFrame:RegisterEvent("CHAT_MSG_COMMUNITIES_CHANNEL")
-    eventFrame:RegisterEvent("CLUB_MESSAGE_ADDED")
+    -- The ticked sources' events, plus the restriction event that follows the chat lockdown.
+    -- Community channels (Community:<clubId>:<streamId>) arrive on their own event.
     eventFrame:RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED")
-    for event in pairs(chatTypeOf) do eventFrame:RegisterEvent(event) end
     Scanner.scanning = true
+    Scanner.RefreshEvents()
     Scanner.matchCount = 0
     store.scanEnabled = true
 
     -- Surfaced at start, so a scan that cannot match never looks healthy.
     Scanner.chatLocked = C_ChatInfo.InChatMessagingLockdown()
     if not isResume then
-        ns.Print(Scanner.chatLocked and LOCKDOWN_NOTICE or string.format("Scanning %s for %s.",
-            ns.countLabel(sources, "source", "sources"), ns.countLabel(#keywordGroups, "rule", "rules")))
+        if Scanner.chatLocked then
+            announceLockdown()
+        else
+            ns.Print(string.format("Scanning %s for %s.", ns.countLabel(sources, "source", "sources"),
+                ns.countLabel(#keywordGroups, "rule", "rules")))
+        end
     end
     fireChanged()
 end

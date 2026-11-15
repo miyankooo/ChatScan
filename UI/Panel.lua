@@ -687,6 +687,7 @@ function ns.SeedChannels()
     store.channelsSeeded = true
     if next(store.inputChannels) then return end
     for _, entry in ipairs(entries) do store.inputChannels[entry.key] = true end
+    Scanner.RefreshEvents()
 end
 
 -- Events that change the channel or output tab lists while the window is open.
@@ -720,6 +721,7 @@ local function buildPanel()
         "Matches show in this chat tab.")
     local chatChecks, chatTypesH = createChatTypeGrid(chatTypesSection.content, function(key, checked)
         Store.Get().chatTypes[key] = checked or nil
+        Scanner.RefreshEvents()
         frame:RefreshStatus()
     end)
     local soundDropdown = createSoundDropdown(soundSection.content)
@@ -783,6 +785,7 @@ local function buildPanel()
         local function isChecked(entry) return channels[entry.key] end
         local function onClick(entry, checked)
             channels[entry.key] = checked or nil
+            Scanner.RefreshEvents()
             self:RefreshStatus()
         end
         ns.SeedChannels()
