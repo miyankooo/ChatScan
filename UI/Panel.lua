@@ -38,6 +38,15 @@ local PANEL_H = 548
 -- bar's gutter free on the right, so the bar stays inside the inset.
 local CONTENT_W = COLUMN_W - PADDING - SCROLL_GUTTER
 
+-- The scroll frame clips its child, and a heading's glyphs reach a pixel or two above their font
+-- string. The scroll area starts this much higher and its sections this much lower, so the top
+-- heading keeps its place and is not cropped.
+local SCROLL_BLEED = 4
+
+-- The portrait (PortraitFrameBaseTemplate, Mainline/SharedUIPanelTemplates.xml:581) reaches 57 px into
+-- the frame. The left column's top heading starts one gap past it, rounded to the grid.
+local PORTRAIT_CLEAR = 48
+
 -- Two chat type blocks share a row of the Chat Types section.
 local BLOCK_W = CONTENT_W / 2
 
@@ -159,10 +168,10 @@ end
 -- SECTION_BODY_TOP plus the body's height.
 local SECTION_DIVIDER_TOP = 16
 local SECTION_BODY_TOP = 24
-local function CreateSection(parent, title)
+local function CreateSection(parent, title, indent)
     local section = CreateFrame("Frame", nil, parent)
     local heading = CreateText(section, GameFontNormal)
-    heading:SetPoint("TOPLEFT")
+    heading:SetPoint("TOPLEFT", indent or 0, 0)
     heading:SetPoint("TOPRIGHT")
     heading:SetText(title)
     local divider = section:CreateTexture(nil, "ARTWORK")
@@ -405,8 +414,8 @@ end
 
 -- A window section whose body holds the section's own content, below an optional muted helper
 -- line. The helper's two anchors give it the width it needs to measure its wrap.
-local function createSection(column, title, helperText)
-    local section = CreateSection(column, title)
+local function createSection(column, title, helperText, indent)
+    local section = CreateSection(column, title, indent)
     section.content = CreateFrame("Frame", nil, section.body)
 
     local helper
@@ -436,7 +445,7 @@ end
 local function createColumnScroll(column)
     local scroll = CreateScroll(column)
     scroll.ScrollBar:SetHideIfUnscrollable(true)
-    scroll:SetPoint("TOPLEFT", PADDING, -PADDING)
+    scroll:SetPoint("TOPLEFT", PADDING, SCROLL_BLEED - PADDING)
     scroll:SetPoint("BOTTOMRIGHT", -SCROLL_GUTTER, PADDING)
     scroll.content:SetWidth(CONTENT_W)
     return scroll
@@ -446,8 +455,8 @@ end
 local function stackSections(sections)
     for i, section in ipairs(sections) do
         if i == 1 then
-            section:SetPoint("TOPLEFT")
-            section:SetPoint("TOPRIGHT")
+            section:SetPoint("TOPLEFT", 0, -SCROLL_BLEED)
+            section:SetPoint("TOPRIGHT", 0, -SCROLL_BLEED)
         else
             section:SetPoint("TOPLEFT", sections[i - 1], "BOTTOMLEFT", 0, -SECTION)
             section:SetPoint("TOPRIGHT", sections[i - 1], "BOTTOMRIGHT", 0, -SECTION)
@@ -458,7 +467,7 @@ end
 -- Sizes the scroll child to its laid-out sections, and pulls the offset back into range when a
 -- list got shorter.
 local function fitScroll(scroll, sections)
-    local height = (#sections - 1) * SECTION
+    local height = SCROLL_BLEED + (#sections - 1) * SECTION
     for _, section in ipairs(sections) do
         height = height + section:GetHeight()
     end
@@ -704,7 +713,7 @@ local function buildPanel()
     local leftScroll, rightScroll = createColumnScroll(left), createColumnScroll(right)
 
     local keywordsSection = createSection(leftScroll.content, "Keywords",
-        "One rule per row. Commas require every word.")
+        "One rule per row. Commas require every word.", PORTRAIT_CLEAR)
     local channelsSection = createSection(leftScroll.content, CHANNELS)
     local chatTypesSection = createSection(rightScroll.content, "Chat Types")
     local outputsSection = createSection(rightScroll.content, "Output Tabs",
