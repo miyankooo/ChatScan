@@ -541,7 +541,7 @@ local function createKeywordRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetHeight(ROW)
 
-    local editBox = CreateHintBox(row, "Type a rule, such as wts thunderfury")
+    local editBox = CreateHintBox(row, "Type a rule, such as wts, thunderfury")
     editBox:SetMaxLetters(256)
     HookTooltip(editBox, RULE_TOOLTIP)
     row.editBox = editBox

@@ -7,7 +7,7 @@ A WoW Forever addon that watches the chat you pick for your keywords and forward
 ## Features
 
 - Each keyword row is one rule. Commas in a row need every word, so `lf, tank` needs both.
-- Keywords match the start of a word and ignore case, so `lf` finds LFG but not "self".
+- Keywords match the start of a word and ignore case, so `lf` finds LFG but not "self". A linked item matches by its name.
 - Watches General, Trade, LookingForGroup, custom and community channels, plus guild, group, say, yell, emote and whisper.
 - Forwarded lines look like the game's own, with clickable names and the time.
 - A repeated line from the same sender shows once every 2 minutes.
@@ -18,7 +18,7 @@ A WoW Forever addon that watches the chat you pick for your keywords and forward
 ## Usage
 
 1. Type `/cs` or click the minimap button. The first time, your joined channels are ticked for you.
-2. Under Keywords, type a rule such as `wts thunderfury` or `lf, tank` and press Enter. The scan starts.
+2. Under Keywords, type a rule such as `wts, thunderfury` or `lf, tank` and press Enter. The scan starts.
 3. Tick the channels and chat types to watch.
 4. Under Output Tabs, tick the chat tabs that get the matches.
 5. Under Sound, pick an alert or None.

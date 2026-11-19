@@ -50,7 +50,7 @@ end
 
 -- One long command and one short alias. The bare command opens the window; help, intro and minimap
 -- are the shared words, start, stop and clear run the scan, and any other text is a rule, so
--- /cs wts thunderfury adds it.
+-- /cs wts, thunderfury adds it.
 SLASH_CHATSCAN1, SLASH_CHATSCAN2 = "/chatscan", "/cs"
 SlashCmdList.CHATSCAN = function(message)
     local raw = ns.trim(message)

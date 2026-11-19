@@ -83,11 +83,11 @@ function ns.trim(text)
     return (text or ""):match("^%s*(.-)%s*$")
 end
 
--- A rule made only of commas and spaces can never match, so it is never stored.
+-- A rule made only of commas, spaces and brackets can never match, so it is never stored.
 ns.NO_TERM = "A rule needs at least one word."
 
 function ns.hasTerm(row)
-    return row:find("[^,%s]") ~= nil
+    return row:find("[^,%s%[%]]") ~= nil
 end
 
 -- Zone channels carry a " - Zone" suffix, so it is dropped to keep a scan alive across zone

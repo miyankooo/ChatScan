@@ -13,6 +13,7 @@ local recentMatches = {}
 local lastSoundTime = 0
 local listeners = {}
 local eventFrame = CreateFrame("Frame")
+local StripHyperlinks = C_StringUtil.StripHyperlinks
 
 -- Lets the panel and minimap tooltip follow scan state without the scanner knowing about frames.
 function Scanner.OnChanged(callback)
@@ -32,12 +33,13 @@ local function termPattern(term)
 end
 
 -- One row is an OR group; commas inside a row separate AND terms. Patterns are built once here.
+-- Matching reads a line without its brackets, so a term loses its own too.
 function Scanner.ReloadKeywords()
     keywordGroups = {}
     for _, row in ipairs(ns.Store.Get().keywords) do
         local terms = {}
         for raw in row:gmatch("[^,]+") do
-            local term = ns.trim(raw)
+            local term = ns.trim((raw:gsub("[%[%]]", "")))
             if term ~= "" then terms[#terms + 1] = termPattern(strlower(term)) end
         end
         if #terms > 0 then keywordGroups[#keywordGroups + 1] = terms end
@@ -45,7 +47,11 @@ function Scanner.ReloadKeywords()
     fireChanged()
 end
 
+-- A line is matched as the player reads it: a linked item counts as its name, without the link's
+-- colour, data and brackets, so "wts thunderfury" finds WTS [Thunderfury] and no rule matches a
+-- link code. Only a line with a link or a bracket pays for the strip.
 local function matchesKeywords(text)
+    if strfind(text, "[|%[]") then text = StripHyperlinks(text) end
     local lower = strlower(text)
     for _, terms in ipairs(keywordGroups) do
         local all = true

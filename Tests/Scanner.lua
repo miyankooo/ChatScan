@@ -56,6 +56,12 @@ C_ChatInfo = {
     IsChatLineCensored = function(lineID) return lineID == CENSORED_LINE end,
 }
 ChatFrameUtil = { GetTimestampFormat = function() return nil end }
+
+-- The client's strip, reduced to what chat lines carry: colours, link data and brackets go, the
+-- link's text stays.
+C_StringUtil = { StripHyperlinks = function(text)
+    return (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h", ""):gsub("|h", ""):gsub("[%[%]]", ""))
+end }
 Constants = { ChatFrameConstants = { MaxChatWindows = 10 } }
 function GetChatWindowInfo(i) return i == 1 and "General" or "" end
 function FCF_IsChatWindowIndexActive(i) return i == 1 end
@@ -142,6 +148,19 @@ rules("thunderfury")
 check("a term matches inside an item link's name",
     matches("WTS |cffff8000|Hitem:19019::::::::60:::::|h[Thunderfury, Blessed Blade of the Windseeker]|h|r"))
 
+-- Links are matched as their visible text
+local LINKED = "WTS |cffff8000|Hitem:19019::::::::60:::::|h[Thunderfury, Blessed Blade of the Windseeker]|h|r 500g"
+rules("wts thunderfury")
+check("a phrase matches across a linked item", matches(LINKED))
+check("a phrase matches a typed bracket name", matches("WTS [Thunderfury] 500g"))
+check("a phrase needs its words together", not matches("WTS cheap Thunderfury"))
+rules("cff")
+check("a rule never matches a link's colour code", not matches(LINKED))
+rules("19019")
+check("a rule never matches a link's data", not matches(LINKED))
+rules("[lfg]")
+check("a bracketed term matches without its brackets", matches("LFG tank") and matches("[LFG] tank"))
+
 rules("100g")
 check("a number term matches at a word start", matches("selling for 100g each"))
 check("a number term skips a longer number", not matches("selling for 1100g each"))
@@ -178,7 +197,8 @@ for i = 1, ns.DEDUP_MAX do say("dedupe evict " .. i, "Filler") end
 check("the oldest entry is evicted beyond the cap", say("dedupe evict", "First"))
 
 -- Rule validation
-check("a rule of commas and spaces has no term", not ns.hasTerm(", ,") and not ns.hasTerm("   "))
+check("a rule of commas, spaces and brackets has no term", not ns.hasTerm(", ,") and not ns.hasTerm("   ")
+    and not ns.hasTerm("[ ]"))
 check("a rule with one word has a term", ns.hasTerm(" , wts"))
 
 -- Alert sound: Master channel, throttled, and off with None
